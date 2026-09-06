@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cobalt クライアント</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#14161a">
+<style>
+  :root{
+    --bg:#14161a;
+    --panel:#1c1f26;
+    --border:#2b2f38;
+    --text:#e8eaed;
+    --sub:#8b93a1;
+    --accent:#5fd0a4;
+    --accent-dim:#3a8f6e;
+    --danger:#e57373;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    padding:20px 16px 60px;
+    max-width:520px;
+    margin-inline:auto;
+  }
+  h1{
+    font-size:20px;
+    font-weight:700;
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+  }
+  .lead{
+    color:var(--sub);
+    font-size:13px;
+    margin:0 0 20px;
+    line-height:1.6;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .card h2{
+    font-size:13px;
+    font-weight:600;
+    color:var(--sub);
+    margin:0 0 12px;
+  }
+  label{
+    display:block;
+    font-size:12px;
+    color:var(--sub);
+    margin:10px 0 4px;
+  }
+  label:first-of-type{margin-top:0;}
+  input[type=text], input[type=password], select{
+    width:100%;
+    background:#101216;
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 11px;
+    border-radius:8px;
+    font-size:14px;
+    outline:none;
+  }
+  input:focus, select:focus{border-color:var(--accent-dim);}
+  .row{display:flex; gap:10px;}
+  .row > div{flex:1;}
+  button{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:8px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    margin-top:14px;
+  }
+  .btn-primary{background:var(--accent); color:#0b1310;}
+  .btn-primary:disabled{background:#3a4a44; color:#7a8a83; cursor:not-allowed;}
+  .btn-ghost{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--sub);
+    margin-top:8px;
+  }
+  details summary{
+    cursor:pointer;
+    font-size:12px;
+    color:var(--sub);
+    list-style:none;
+  }
+  details summary::-webkit-details-marker{display:none;}
+  details[open] summary{margin-bottom:10px;}
+  .result{
+    margin-top:6px;
+    font-size:13px;
+    line-height:1.6;
+    word-break:break-all;
+  }
+  .result.error{color:var(--danger);}
+  .dl-link{
+    display:block;
+    background:var(--accent);
+    color:#0b1310;
+    text-align:center;
+    padding:12px;
+    border-radius:8px;
+    text-decoration:none;
+    font-weight:600;
+    margin-top:10px;
+  }
+  .picker-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 0;
+    border-top:1px solid var(--border);
+  }
+  .picker-item:first-child{border-top:none;}
+  .picker-item img{width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;background:#000;}
+  .picker-item a{color:var(--accent); font-size:13px; text-decoration:none;}
+  .note{font-size:11px; color:var(--sub); margin-top:6px; line-height:1.5;}
+  .status-dot{
+    display:inline-block;
+    width:7px;height:7px;
+    border-radius:50%;
+    margin-right:6px;
+    background:var(--sub);
+  }
+  .status-dot.ok{background:var(--accent);}
+  .status-dot.ng{background:var(--danger);}
+</style>
+</head>
+<body>
+
+<h1>cobalt クライアント</h1>
+<p class="lead">
+  <a href="https://github.com/imputnet/cobalt" style="color:var(--sub)">cobalt</a> API を叩いて動画/音声をダウンロードするブラウザ版クライアントです。
+  公式ホスト（api.cobalt.tools）はBot対策により外部利用不可のため、<b>自分でホストしたcobaltインスタンス</b>のURLを設定してください。
+</p>
+
+<div class="card">
+  <h2>インスタンス設定</h2>
+  <label>インスタンスURL（例: https://your-instance.example.com）</label>
+  <input type="text" id="instanceUrl" placeholder="https://...">
+  <label>認証（任意・APIキー or Bearerトークン）</label>
+  <div class="row">
+    <div>
+      <select id="authScheme">
+        <option value="">なし</option>
+        <option value="Api-Key">Api-Key</option>
+        <option value="Bearer">Bearer</option>
+      </select>
+    </div>
+    <div style="flex:2">
+      <input type="password" id="authToken" placeholder="トークン">
+    </div>
+  </div>
+  <div class="note">
+    <span id="pingDot" class="status-dot"></span><span id="pingText">未接続</span>
+  </div>
+  <button class="btn-ghost" id="pingBtn">接続確認</button>
+</div>
+
+<div class="card">
+  <h2>ダウンロード</h2>
+  <label>メディアURL</label>
+  <input type="text" id="mediaUrl" placeholder="https://www.youtube.com/watch?v=...">
+
+  <div class="row">
+    <div>
+      <label>モード</label>
+      <select id="downloadMode">
+        <option value="auto">自動（動画+音声）</option>
+        <option value="audio">音声のみ</option>
+        <option value="mute">無音動画</option>
+      </select>
+    </div>
+    <div>
+      <label>映像品質</label>
+      <select id="videoQuality">
+        <option value="max">最高</option>
+        <option value="2160">2160p</option>
+        <option value="1440">1440p</option>
+        <option value="1080" selected>1080p</option>
+        <option value="720">720p</option>
+        <option value="480">480p</option>
+        <option value="360">360p</option>
+      </select>
+    </div>
+  </div>
+
+  <details>
+    <summary>詳細オプション ▸</summary>
+    <div class="row">
+      <div>
+        <label>音声形式</label>
+        <select id="audioFormat">
+          <option value="mp3" selected>mp3</option>
+          <option value="best">best</option>
+          <option value="ogg">ogg</option>
+          <option value="wav">wav</option>
+          <option value="opus">opus</option>
+        </select>
+      </div>
+      <div>
+        <label>音声ビットレート</label>
+        <select id="audioBitrate">
+          <option value="320">320</option>
+          <option value="256">256</option>
+          <option value="128" selected>128</option>
+          <option value="96">96</option>
+          <option value="64">64</option>
+        </select>
+      </div>
+    </div>
+    <label>ファイル名の形式</label>
+    <select id="filenameStyle">
+      <option value="basic" selected>basic</option>
+      <option value="classic">classic</option>
+      <option value="pretty">pretty</option>
+      <option value="nerdy">nerdy</option>
+    </select>
+  </details>
+
+  <button class="btn-primary" id="submitBtn">取得する</button>
+  <div id="result"></div>
+</div>
+
+<p class="note">
+  設定はこのページを閉じると保持されません（ブラウザストレージ未使用）。cobalt は公開されているコンテンツの取得のみを想定しており、利用にあたっての責任は利用者に帰属します。
+</p>
+
+<script>
+function getInstanceUrl(){
+  let v = document.getElementById('instanceUrl').value.trim();
+  return v.replace(/\/+$/, '');
+}
+function getAuthHeader(){
+  const scheme = document.getElementById('authScheme').value;
+  const token = document.getElementById('authToken').value.trim();
+  if(!scheme || !token) return null;
+  return scheme + ' ' + token;
+}
+
+document.getElementById('pingBtn').addEventListener('click', async () => {
+  const dot = document.getElementById('pingDot');
+  const text = document.getElementById('pingText');
+  const base = getInstanceUrl();
+  if(!base){ text.textContent = 'インスタンスURL未入力'; dot.className='status-dot ng'; return; }
+  text.textContent = '確認中…';
+  dot.className = 'status-dot';
+  try{
+    const res = await fetch(base + '/', { headers: { 'Accept': 'application/json' } });
+    const data = await res.json();
+    if(data && data.cobalt){
+      dot.className = 'status-dot ok';
+      text.textContent = `接続OK: cobalt v${data.cobalt.version}（対応サービス ${data.cobalt.services ? data.cobalt.services.length : '?'}件）`;
+    } else {
+      dot.className = 'status-dot ng';
+      text.textContent = '応答はあったが形式が不正です';
+    }
+  }catch(e){
+    dot.className = 'status-dot ng';
+    text.textContent = '接続失敗: ' + e.message;
+  }
+});
+
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const resultEl = document.getElementById('result');
+  const btn = document.getElementById('submitBtn');
+  resultEl.innerHTML = '';
+  const base = getInstanceUrl();
+  const url = document.getElementById('mediaUrl').value.trim();
+
+  if(!base){
+    resultEl.innerHTML = '<div class="result error">インスタンスURLを入力してください</div>';
+    return;
+  }
+  if(!url){
+    resultEl.innerHTML = '<div class="result error">メディアURLを入力してください</div>';
+    return;
+  }
+
+  const body = {
+    url,
+    downloadMode: document.getElementById('downloadMode').value,
+    videoQuality: document.getElementById('videoQuality').value,
+    audioFormat: document.getElementById('audioFormat').value,
+    audioBitrate: document.getElementById('audioBitrate').value,
+    filenameStyle: document.getElementById('filenameStyle').value,
+  };
+
+  const headers = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  };
+  const auth = getAuthHeader();
+  if(auth) headers['Authorization'] = auth;
+
+  btn.disabled = true;
+  btn.textContent = '取得中…';
+  resultEl.innerHTML = '<div class="result">リクエスト送信中…</div>';
+
+  try{
+    const res = await fetch(base + '/', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    renderResult(data);
+  }catch(e){
+    resultEl.innerHTML = `<div class="result error">通信エラー: ${escapeHtml(e.message)}<br><span class="note">CORSやインスタンスURLの設定を確認してください。</span></div>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '取得する';
+  }
+});
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderResult(data){
+  const resultEl = document.getElementById('result');
+  if(!data || !data.status){
+    resultEl.innerHTML = '<div class="result error">不明な応答形式です</div>';
+    return;
+  }
+
+  switch(data.status){
+    case 'tunnel':
+    case 'redirect': {
+      resultEl.innerHTML = `
+        <div class="result">ファイル名: ${escapeHtml(data.filename || '不明')}</div>
+        <a class="dl-link" href="${data.url}" target="_blank" rel="noopener">ダウンロード</a>
+      `;
+      break;
+    }
+    case 'local-processing': {
+      const tunnels = (data.tunnel || []).map((t,i) =>
+        `<a class="dl-link" href="${t}" target="_blank" rel="noopener">パート${i+1}をダウンロード</a>`
+      ).join('');
+      resultEl.innerHTML = `
+        <div class="result">
+          種別: ${escapeHtml(data.type || '')} / サービス: ${escapeHtml(data.service || '')}<br>
+          出力ファイル名: ${escapeHtml(data.output?.filename || '不明')}
+        </div>
+        ${tunnels}
+        <div class="note">local-processing 応答のため、複数パートはブラウザ側での結合・変換が必要な場合があります。</div>
+      `;
+      break;
+    }
+    case 'picker': {
+      let html = '<div class="result">複数のメディアが見つかりました:</div>';
+      if(data.audio){
+        html += `<a class="dl-link" href="${data.audio}" target="_blank" rel="noopener">共通音声をダウンロード（${escapeHtml(data.audioFilename||'')}）</a>`;
+      }
+      (data.picker || []).forEach((item, i) => {
+        html += `
+          <div class="picker-item">
+            ${item.thumb ? `<img src="${item.thumb}">` : ''}
+            <a href="${item.url}" target="_blank" rel="noopener">[${escapeHtml(item.type)}] アイテム ${i+1} を開く</a>
+          </div>
+        `;
+      });
+      resultEl.innerHTML = html;
+      break;
+    }
+    case 'error': {
+      const code = data.error?.code || '不明なエラー';
+      const ctx = data.error?.context ? ` (${JSON.stringify(data.error.context)})` : '';
+      resultEl.innerHTML = `<div class="result error">エラー: ${escapeHtml(code)}${escapeHtml(ctx)}</div>`;
+      break;
+    }
+    default:
+      resultEl.innerHTML = `<div class="result error">未対応のステータス: ${escapeHtml(data.status)}</div>`;
+  }
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+
+</body>
+</html>
